@@ -167,3 +167,4 @@ Set `VITE_USE_FIREBASE_EMULATOR=true` in your `.env` file and start the Vite dev
 4. **Attendance Integrity:** Official attendance records and sessions can only be committed by authenticated teachers or administrators. Students are denied write permissions.
 5. **Audited User Provisioning:** Teacher and student account creation is orchestrated through trusted server-side flows or administrator governance.
 # CampusConnect
+# CampusConnect
