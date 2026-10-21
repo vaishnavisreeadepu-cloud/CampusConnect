@@ -1,0 +1,72 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isPermittedDocument() {
+      return request.resource.contentType.matches('application/pdf') ||
+             request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.wordprocessingml.document') ||
+             request.resource.contentType.matches('application/msword') ||
+             request.resource.contentType.matches('application/vnd.openxmlformats-officedocument.presentationml.presentation') ||
+             request.resource.contentType.matches('image/.*');
+    }
+
+    function isPermittedImage() {
+      return request.resource.contentType.matches('image/.*') &&
+             request.resource.size < 5 * 1024 * 1024;
+    }
+
+    // Default rule: reject
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+
+    // Public branding / logo assets
+    match /branding/{fileName} {
+      allow read: if true;
+      allow write: if isAuthenticated() && isPermittedImage();
+    }
+
+    // User avatars
+    match /avatars/{userId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() && (request.auth.uid == userId) && isPermittedImage();
+    }
+
+    // Course Study Materials / Notes uploaded by Teachers
+    match /materials/{classId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() &&
+                     request.resource.size < 25 * 1024 * 1024 &&
+                     isPermittedDocument();
+    }
+
+    // Assignment question attachments
+    match /assignments/{assignmentId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() &&
+                     request.resource.size < 25 * 1024 * 1024 &&
+                     isPermittedDocument();
+    }
+
+    // Student Submissions
+    match /submissions/{assignmentId}/{studentId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() &&
+                     (request.auth.uid == studentId) &&
+                     request.resource.size < 25 * 1024 * 1024 &&
+                     isPermittedDocument();
+    }
+
+    // Chat Attachments
+    match /messages/{conversationId}/{fileName} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated() &&
+                     request.resource.size < 15 * 1024 * 1024 &&
+                     isPermittedDocument();
+    }
+  }
+}
