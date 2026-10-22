@@ -3,7 +3,8 @@
  * Supports Firebase Auth and role-based user profiles
  */
 
-import { auth, isLiveFirebaseConfigured } from "./firebase";
+import { auth, db, isLiveFirebaseConfigured } from "./firebase";
+import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import {
   signInWithEmailAndPassword,
   signOut,
@@ -117,10 +118,37 @@ export const authService = {
         
         // Fetch role and profile from users collection
         const allUsers = await getDocuments("users");
-        const profile = allUsers.find((u) => u.uid === fbUser.uid || u.email.toLowerCase() === cleanEmail);
-        
+        let profile = allUsers.find(
+          (u) => u.uid === fbUser.uid || u.email?.toLowerCase() === cleanEmail
+        );
+
+        // If Firestore profile creation failed during sign-up, try recovering
+        // the profile saved in this browser and persist it to Firestore.
         if (!profile) {
-          throw new Error("User profile not found in college registry.");
+          const localProfile = getLocalCollection("users").find(
+            (u) => u.uid === fbUser.uid || u.email?.toLowerCase() === cleanEmail
+          );
+
+          if (localProfile) {
+            profile = { ...localProfile, uid: fbUser.uid, id: fbUser.uid };
+            try {
+              await setDoc(doc(db, "users", fbUser.uid), {
+                ...profile,
+                serverTimestamp: new Date().toISOString(),
+              });
+            } catch (writeError) {
+              console.error("Could not restore user profile in Firestore:", writeError);
+              throw new Error(
+                "Your account exists, but your college profile could not be saved to Firestore. Check Firestore Rules and allow the signed-in user to create their own users document."
+              );
+            }
+          }
+        }
+
+        if (!profile) {
+          throw new Error(
+            "Your Firebase account exists, but its college profile is missing. Please sign up again on the same browser if you used it before, or ask the college administrator to restore your profile."
+          );
         }
         if (profile.active === false) {
           throw new Error("This account has been deactivated. Please contact the administrator.");
@@ -254,7 +282,24 @@ export const authService = {
     }
 
     // 4. Save persistently into Cloud Firestore (`users` collection)
-    await addDocument("users", newProfile);
+    if (isLiveFirebaseConfigured) {
+      // Do not report successful registration if Firestore failed to save the profile.
+      try {
+        await setDoc(doc(db, "users", uid), {
+          ...newProfile,
+          serverTimestamp: new Date().toISOString(),
+        });
+      } catch (err) {
+        console.error("Could not save new user profile to Firestore:", err);
+        throw new Error(
+          "Your authentication account was created, but your college profile could not be saved. Check Firestore Rules for the users collection before trying again."
+        );
+      }
+      // Keep this browser's local cache in sync.
+      await addDocument("users", newProfile);
+    } else {
+      await addDocument("users", newProfile);
+    }
 
     // 5. Establish local active session and broadcast login
     localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(newProfile));
