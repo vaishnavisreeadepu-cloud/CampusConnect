@@ -127,7 +127,7 @@ export const SignUpPage = () => {
         departmentId: departmentId || (departments[0]?.id || "dept-cse"),
         ...(selectedRole === "student"
           ? {
-              classId: classId || (classes[0]?.id || "cse-y2-a"),
+              classId: classId || (allClasses[0]?.id || "cse-y2-a"),
               className: selectedClassObj?.name || "B.Tech CSE - 2nd Year (Section A)",
               rollNumber: rollNumber || `${Math.floor(100 + Math.random() * 900)}`,
               studentId: studentId || `STU-${new Date().getFullYear()}-${Date.now().toString().slice(-4)}`,
@@ -191,7 +191,7 @@ export const SignUpPage = () => {
       };
 
       if (selectedRole === "student") {
-        registrationPayload.classId = classId || (classes[0]?.id || "cse-y2-a");
+        registrationPayload.classId = classId || (allClasses[0]?.id || "cse-y2-a");
         registrationPayload.className =
           selectedClassObj?.name || "B.Tech CSE - 2nd Year (Section A)";
         registrationPayload.year = selectedClassObj?.year || "2nd Year";
